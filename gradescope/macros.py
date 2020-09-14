@@ -5,16 +5,16 @@ import typing as _typing
 
 import bs4 as _bs4
 
-import pylifttk.util
+import gradescope.raw_util
 
-import pylifttk.gradescope.api
-import pylifttk.gradescope.util
+import gradescope.api
+import gradescope.util
 
 
 ASSIGNMENT_URL_PATTERN = r"/courses/([0-9]*)/assignments/([0-9]*)$"
 
 
-class GradescopeRole(pylifttk.util.DocEnum):
+class GradescopeRole(gradescope.raw_util.DocEnum):
 
     # <option value="0">Student</option>
     # <option selected="selected" value="1">Instructor</option>
@@ -30,16 +30,16 @@ class GradescopeRole(pylifttk.util.DocEnum):
 def get_assignment_grades(course_id, assignment_id, simplified=False, **kwargs):
 
     # Fetch the grades
-    response = pylifttk.gradescope.api.request(
+    response = gradescope.api.request(
         endpoint="courses/{}/assignments/{}/scores.csv".format(course_id, assignment_id)
     )
 
     # Parse the CSV format
-    grades = pylifttk.gradescope.util.parse_csv(response.content)
+    grades = gradescope.util.parse_csv(response.content)
 
     # Summarize it if necessary by removing question-level data
     if simplified:
-        shortened_grades = list(map(pylifttk.gradescope.util.shortened_grade_record, grades))
+        shortened_grades = list(map(gradescope.util.shortened_grade_record, grades))
         return shortened_grades
 
     return grades
@@ -48,12 +48,12 @@ def get_assignment_grades(course_id, assignment_id, simplified=False, **kwargs):
 def get_course_roster(course_id, **kwargs):
 
     # Fetch the grades
-    response = pylifttk.gradescope.api.request(
+    response = gradescope.api.request(
         endpoint="courses/{}/memberships.csv".format(course_id)
     )
 
     # Parse the CSV format
-    roster = pylifttk.gradescope.util.parse_csv(response.content)
+    roster = gradescope.util.parse_csv(response.content)
 
     return roster
 
@@ -71,7 +71,7 @@ def invite_many(course_id, role, users, **kwargs):
     payload["role"] = role
 
     # Fetch the grades
-    response = pylifttk.gradescope.api.request(
+    response = gradescope.api.request(
         endpoint="courses/{}/memberships/many".format(course_id),
         data=payload,
     )
@@ -80,7 +80,7 @@ def invite_many(course_id, role, users, **kwargs):
 
 
 def get_courses(by_name=False):
-    response = pylifttk.gradescope.api.request(endpoint="account")
+    response = gradescope.api.request(endpoint="account")
     soup = _bs4.BeautifulSoup(response.content, features="html.parser")
     hrefs = list(filter(lambda s: s, map(
         lambda anchor: anchor.get("href"),
@@ -95,7 +95,7 @@ def get_courses(by_name=False):
 
 
 def get_course_name(course_id):
-    result = pylifttk.gradescope.api.request(endpoint="courses/{}".format(course_id))
+    result = gradescope.api.request(endpoint="courses/{}".format(course_id))
     soup = _bs4.BeautifulSoup(result.content.decode(), features="html.parser")
     header_element = soup.find("header", {"class": "courseHeader"})
     if header_element:
@@ -116,7 +116,7 @@ def get_course_id(course_name, course_term):
 
 def get_course_assignments(course_id):
     # NOTE: remove "/assignments" for only active assignments?
-    result = pylifttk.gradescope.api.request(endpoint="courses/{}/assignments".format(course_id))
+    result = gradescope.api.request(endpoint="courses/{}/assignments".format(course_id))
     soup = _bs4.BeautifulSoup(result.content.decode(), features="html.parser")
 
     assignment_table = soup.find("table", {"class": "table-assignments"})
@@ -170,7 +170,7 @@ def get_course_grades(course_id, only_graded=True, use_email=True):
             student_id = record["sid"]
             if use_email:
                 student_id = record["email"]
-            grade = pylifttk.util.robust_float(record.get("score"))
+            grade = gradescope.raw_util.robust_float(record.get("score"))
 
             # Add grade to student
             grades[student_id] = grades.get(student_id, dict())

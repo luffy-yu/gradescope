@@ -9,8 +9,8 @@ import requests as _requests
 import six as _six
 import wsse.client.requests.auth as _wsse_auth
 
-import pylifttk.gradescope
-import pylifttk.gradescope.exceptions
+import gradescope
+import gradescope.exceptions
 
 
 BASE_URL = "https://www.gradescope.com"
@@ -65,8 +65,8 @@ def get_auth_cookies(username=None, password=None, **kwargs):
             data={
                 "utf8": "✓",
                 "authenticity_token": authenticity_token,
-                "session[email]": username or pylifttk.gradescope.config["username"],
-                "session[password]": password or pylifttk.gradescope.config["password"],
+                "session[email]": username or gradescope.config["username"],
+                "session[password]": password or gradescope.config["password"],
                 "session[remember_me]": "0,1",
                 "commit": "Log+In",
                 "session[remember_me_sso]": "0",
@@ -156,6 +156,6 @@ def request(endpoint=None, url=None, data=None, json=None, **kwargs):
     except _requests.RequestException as exc:
         raise
 
-    pylifttk.gradescope.exceptions.handle_api_error(res)
+    gradescope.exceptions.handle_api_error(res)
 
     return res

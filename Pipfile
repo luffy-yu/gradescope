@@ -9,15 +9,11 @@ ipykernel = "*"
 [packages]
 pywsse = "*"
 requests = "*"
-python-dateutil = "*"
 pyyaml = "*"
 six = "*"
 confuse = "*"
 bs4 = "*"
-codepost = "*"
 enum34 = "*"
-ipykernel = "*"
-canvasapi = "*"
 
 [requires]
 python_version = "3.8"

@@ -1,7 +1,7 @@
 import os
 from setuptools import setup, find_packages
 
-PACKAGE_NAME = "pylifttk"
+PACKAGE_NAME = "gradescope"
 
 # The text of the README file
 README = open("README.md").read()
@@ -17,24 +17,22 @@ with open(os.path.join(PACKAGE_NAME, "version.py")) as f:
 setup(
     name=PACKAGE_NAME,
     version=version_contents["__version__"],
-    description="Python utility toolkit for Princeton CS's LIFT.",
+    description="Python utility toolkit for Gradescope",
     long_description=README,
     long_description_content_type="text/markdown",
-    url="https://github.com/jlumbroso/pylifttk",
-    author="Jérémie Lumbroso",
-    author_email="lumbroso@cs.princeton.edu",
+    url="https://github.com/mooey5775/gradescope",
+    author="Edward Li",
+    author_email="edwardli@andrew.cmu.edu",
     license="MIT",
     classifiers=[
         "License :: OSI Approved :: MIT License",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
     ],
     packages=find_packages(),
     install_requires=[
         "bs4",
-        "codepost",
         "confuse",
-        "python-dateutil",
         "pywsse",
         "PyYAML",
         "requests",
