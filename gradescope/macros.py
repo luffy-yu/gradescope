@@ -120,21 +120,34 @@ def get_course_assignments(course_id):
     soup = _bs4.BeautifulSoup(result.content.decode(), features="html.parser")
 
     assignment_table = soup.find("table", {"class": "table-assignments"})
-    anchors = assignment_table.find_all("a")
-
+    assignment_rows = assignment_table.findChildren("tr",
+                      {"class": "js-assignmentTableAssignmentRow"})
+    
     assignments = []
-    for anchor in anchors:
-        url = anchor.get("href")
-        if url is None or url == "":
-            continue
-        match = _re.match(ASSIGNMENT_URL_PATTERN, url)
-        if match is None:
+    for row in assignment_rows:
+        anchors = row.find_all("a")
+
+        assignment = None
+        for anchor in anchors:
+            url = anchor.get("href")
+            if url is None or url == "":
+                continue
+            match = _re.match(ASSIGNMENT_URL_PATTERN, url)
+            if match is None:
+                continue
+
+            assignment = {
+                "id": match.group(2),
+                "name": anchor.text
+            }
+        
+        if assignment == None:
             continue
 
-        assignments.append({
-            "id": match.group(2),
-            "name": anchor.text
-        })
+        assignment["published"] = len(row.findAll("i",
+            {"class": "workflowCheck-complete"})) > 0
+
+        assignments.append(assignment)
 
     return assignments
 
