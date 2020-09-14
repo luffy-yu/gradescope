@@ -2,6 +2,9 @@
 import collections as _collections
 import re as _re
 import typing as _typing
+import tempfile as _tempfile
+import os as _os
+import csv as _csv
 
 import bs4 as _bs4
 
@@ -42,7 +45,58 @@ def get_assignment_grades(course_id, assignment_id, simplified=False, **kwargs):
         shortened_grades = list(map(gradescope.util.shortened_grade_record, grades))
         return shortened_grades
 
+    # Collapse assignment grades into dictionary key
+    grades = gradescope.util.collapse_grades(grades)
+
     return grades
+
+def get_assignment_evaluations(course_id, assignment_id, **kwargs):
+    response = gradescope.api.request(
+        endpoint="courses/{}/assignments/{}/export_evaluations".format(course_id,
+        assignment_id)
+    )
+
+    # Fetch assignment grades for scaffolding
+    grades = get_assignment_grades(course_id, assignment_id)
+
+    if len(grades) == 0:
+        return []
+
+    subid_grades = {person['Submission ID']: person for person in grades}
+
+    # Open temp directory for extraction
+    with _tempfile.TemporaryDirectory() as td:
+        file_path = gradescope.util.extract_evaluations(td, response.content)
+
+        # Find question name for each sheet
+        sheets = [i for i in _os.listdir(file_path) if '.csv' in i]
+        sheet_map = gradescope.util.map_sheets(sheets, grades[0]['questions'].keys())
+
+        # Read questions from each sheet
+        for sheet in sheets:
+            q_name = sheet_map[sheet]
+            with open(_os.path.join(file_path, sheet)) as csvfile:
+                reader = _csv.DictReader(
+                            csvfile,
+                            quotechar='"',
+                            delimiter=',',
+                            quoting=_csv.QUOTE_ALL,
+                            skipinitialspace=True)
+                # Match rows to students
+                for row in reader:
+                    if row['Assignment Submission ID'] not in subid_grades:
+                        continue
+
+                    subid = row['Assignment Submission ID']
+
+                    new_row = gradescope.util.read_eval_row(row)
+
+                    if new_row['score'] != subid_grades[subid]['questions'][q_name]:
+                        raise ValueError('Mismatched scores!')
+
+                    subid_grades[subid]['questions'][q_name] = new_row
+
+    return list(subid_grades.values())
 
 
 def get_course_roster(course_id, **kwargs):
