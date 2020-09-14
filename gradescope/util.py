@@ -92,6 +92,7 @@ def read_eval_row(row):
         'score': robust_float(row['Score']),
         'adjustment': robust_float(row['Adjustment']),
         'comment': row['Comments'],
+        'grader': row['Grader'],
         'rubric_items': {item: (row[item] == 'true') for item in rubric_items}
     }
 
