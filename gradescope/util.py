@@ -4,6 +4,8 @@ import os as _os
 import io as _io
 import zipfile as _zipfile
 
+from gradescope.raw_util import robust_float
+
 NUM_HOUSEKEEPING_COLS = 10
 
 def parse_csv(content):
@@ -33,6 +35,10 @@ def extract_evaluations(td, content):
 
     return _os.path.join(td, extracted_files[0])
 
+def to_numeric(dictlist, fields):
+    for elt in dictlist:
+        for field in fields:
+            elt[field] = robust_float(elt[field])
 
 def shortened_grade_record(record):
     return {
@@ -57,16 +63,21 @@ def collapse_grades(grades):
 
     for i, person in enumerate(grades):
         collapsed[i]['questions'] = {k: person[k] for k in sections}
+        to_numeric([collapsed[i]['questions']], sections)
 
     return collapsed
 
 def map_sheets(sheets, questions):
-    q_names = {question.split(':')[0]: question for question in questions}
+    q_names = {question.split(':')[0] if ':' in question else question.split(' ')[0]: question for question in questions}
+    sheet_map = {}
 
-    try:
-        sheet_map = {sheet: q_names[sheet.split('_')[0]] for sheet in sheets}
-    except KeyError:
-        raise FileNotFoundError("Evaluations contains extraneous questions")
+    for sheet in sheets:
+        name = sheet.split('_')[0]
+        if name not in q_names:
+            name = '.'.join(sheet.split('.')[:-1])
+            if name not in q_names:
+               raise FileNotFoundError("Evaluations contains extraneous questions") 
+        sheet_map[sheet] = q_names[name]
 
     if len(sheet_map) != len(sheets):
         raise FileNotFoundError("Not all questions found in evaluations")
@@ -78,8 +89,8 @@ def read_eval_row(row):
     rubric_items = keys[7:-4]
 
     new_row = {
-        'score': row['Score'],
-        'adjustment': row['Adjustment'],
+        'score': robust_float(row['Score']),
+        'adjustment': robust_float(row['Adjustment']),
         'comment': row['Comments'],
         'rubric_items': {item: (row[item] == 'true') for item in rubric_items}
     }

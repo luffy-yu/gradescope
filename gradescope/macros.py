@@ -13,6 +13,8 @@ import gradescope.raw_util
 import gradescope.api
 import gradescope.util
 
+from gradescope.raw_util import robust_float
+
 
 ASSIGNMENT_URL_PATTERN = r"/courses/([0-9]*)/assignments/([0-9]*)$"
 
@@ -47,6 +49,7 @@ def get_assignment_grades(course_id, assignment_id, simplified=False, **kwargs):
 
     # Collapse assignment grades into dictionary key
     grades = gradescope.util.collapse_grades(grades)
+    gradescope.util.to_numeric(grades, ('Total Score', 'Max Points', 'View Count'))
 
     return grades
 
@@ -237,7 +240,7 @@ def get_course_grades(course_id, only_graded=True, use_email=True):
             student_id = record["sid"]
             if use_email:
                 student_id = record["email"]
-            grade = gradescope.raw_util.robust_float(record.get("score"))
+            grade = robust_float(record.get("score"))
 
             # Add grade to student
             grades[student_id] = grades.get(student_id, dict())

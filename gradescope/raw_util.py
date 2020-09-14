@@ -66,7 +66,7 @@ def robust_float(obj, default=0.0):
     obj_float = default
     try:
         obj_float = float(obj)
-    except ValueError:
+    except (ValueError, TypeError):
         pass
     return obj_float
 
