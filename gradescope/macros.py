@@ -1,26 +1,25 @@
-
 import collections as _collections
-import re as _re
-import typing as _typing
-import tempfile as _tempfile
-import os as _os
 import csv as _csv
+import json
+import os as _os
+import tempfile as _tempfile
+import typing as _typing
+from datetime import datetime
 
 import bs4 as _bs4
-
-import gradescope.raw_util
+import pytz
 
 import gradescope.api
+import gradescope.raw_util
 import gradescope.util
-
 from gradescope.raw_util import robust_float
 
+us_est_timezone = pytz.timezone('US/Eastern')
 
 ASSIGNMENT_URL_PATTERN = r"/courses/([0-9]*)/assignments/([0-9]*)$"
 
 
 class GradescopeRole(gradescope.raw_util.DocEnum):
-
     # <option value="0">Student</option>
     # <option selected="selected" value="1">Instructor</option>
     # <option value="2">TA</option>
@@ -33,7 +32,6 @@ class GradescopeRole(gradescope.raw_util.DocEnum):
 
 
 def get_assignment_grades(course_id, assignment_id, simplified=False, **kwargs):
-
     # Fetch the grades
     response = gradescope.api.request(
         endpoint="courses/{}/assignments/{}/scores.csv".format(course_id, assignment_id)
@@ -53,10 +51,11 @@ def get_assignment_grades(course_id, assignment_id, simplified=False, **kwargs):
 
     return grades
 
+
 def get_assignment_evaluations(course_id, assignment_id, **kwargs):
     response = gradescope.api.request(
         endpoint="courses/{}/assignments/{}/export_evaluations".format(course_id,
-        assignment_id)
+                                                                       assignment_id)
     )
 
     # Fetch assignment grades for scaffolding
@@ -80,11 +79,11 @@ def get_assignment_evaluations(course_id, assignment_id, **kwargs):
             q_name = sheet_map[sheet]
             with open(_os.path.join(file_path, sheet)) as csvfile:
                 reader = _csv.DictReader(
-                            csvfile,
-                            quotechar='"',
-                            delimiter=',',
-                            quoting=_csv.QUOTE_ALL,
-                            skipinitialspace=True)
+                    csvfile,
+                    quotechar='"',
+                    delimiter=',',
+                    quoting=_csv.QUOTE_ALL,
+                    skipinitialspace=True)
                 # Match rows to students
                 for row in reader:
                     if row['Assignment Submission ID'] not in subid_grades:
@@ -103,7 +102,6 @@ def get_assignment_evaluations(course_id, assignment_id, **kwargs):
 
 
 def get_course_roster(course_id, **kwargs):
-
     # Fetch the grades
     response = gradescope.api.request(
         endpoint="courses/{}/memberships.csv".format(course_id)
@@ -176,41 +174,55 @@ def get_course_assignments(course_id):
     result = gradescope.api.request(endpoint="courses/{}/assignments".format(course_id))
     soup = _bs4.BeautifulSoup(result.content.decode(), features="html.parser")
 
-    assignment_table = soup.find("table", {"class": "table-assignments"})
-    assignment_rows = assignment_table.findChildren("tr",
-                      {"class": "js-assignmentTableAssignmentRow"})
-    
+    assignment_table = soup.find('div', {'data-react-class': 'AssignmentsTable'})
+    table_data = json.loads(assignment_table.attrs['data-react-props'])
+    assignment_rows = table_data['table_data']
+
     assignments = []
     for row in assignment_rows:
-        anchors = row.find_all("a")
-
-        assignment = None
-        for anchor in anchors:
-            url = anchor.get("href")
-            if url is None or url == "":
-                continue
-            match = _re.match(ASSIGNMENT_URL_PATTERN, url)
-            if match is None:
-                continue
-
-            assignment = {
-                "id": match.group(2),
-                "name": anchor.text
-            }
-        
-        if assignment == None:
-            continue
-
-        assignment["published"] = len(row.findAll("i",
-            {"class": "workflowCheck-complete"})) > 0
-
-        assignments.append(assignment)
+        if 'is_published' in row:
+            assignment = dict(id=row['id'], name=row['title'], url=row['url'])
+            assignments.append(assignment)
 
     return assignments
 
 
-def get_course_grades(course_id, only_graded=True, use_email=True):
+def get_course_assignment_by_name(course_id, assignment_name):
+    assignments = get_course_assignments(course_id)
+    for assignment in assignments:
+        if assignment['name'] == assignment_name:
+            return assignment
+    return None
 
+
+def format_time(src_time):
+    # change to us est time
+    time = datetime.strptime(src_time, '%Y-%m-%d %H:%M:%S %z').astimezone(us_est_timezone)
+    time = datetime.strftime(time, '%Y-%m-%d %H:%M:%S')
+    return time
+
+
+def get_course_assignment_submissions_by_name(course_id, assignment_name):
+    assignment = get_course_assignment_by_name(course_id, assignment_name)
+    if assignment is None:
+        return
+
+    result = gradescope.api.request(endpoint=f'{assignment["url"]}/submissions')
+    soup = _bs4.BeautifulSoup(result.content.decode(), features="html.parser")
+    table_data = soup.find('table', {'class': 'js-programmingAssignmentSubmissionsTable'}).find('tbody').findChildren(
+        'tr')
+    result = []
+    for row in table_data:
+        name = row.find('a').text
+        time = row.find('time').attrs['datetime']  # "2024-02-04 20:57:57 -0800"
+        time = format_time(time)
+        grader = row.findAll('span', {'class': 'sectionsColumnCell--sectionSpan'})[-1].text
+        data = dict(name=name, time=time, grader=grader)
+        result.append(data)
+    return result
+
+
+def get_course_grades(course_id, only_graded=True, use_email=True):
     # Dictionary mapping student emails to grades
     grades = {}
 
@@ -247,5 +259,3 @@ def get_course_grades(course_id, only_graded=True, use_email=True):
             grades[student_id][assignment_name] = grade
 
     return grades
-
-
