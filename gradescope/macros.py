@@ -2,6 +2,7 @@ import collections as _collections
 import csv as _csv
 import json
 import os as _os
+import re
 import tempfile as _tempfile
 import typing as _typing
 from datetime import datetime
@@ -33,9 +34,12 @@ class GradescopeRole(gradescope.raw_util.DocEnum):
 
 def get_assignment_grades(course_id, assignment_id, simplified=False, **kwargs):
     # Fetch the grades
+    # https://www.gradescope.com/courses/702597/assignments/4023169/grade
     response = gradescope.api.request(
-        endpoint="courses/{}/assignments/{}/scores.csv".format(course_id, assignment_id)
+        endpoint=f'courses/{course_id}/assignments/{assignment_id}/grade'
     )
+
+    soup = _bs4.BeautifulSoup(response.content, features="html.parser")
 
     # Parse the CSV format
     grades = gradescope.util.parse_csv(response.content)
@@ -181,7 +185,8 @@ def get_course_assignments(course_id):
     assignments = []
     for row in assignment_rows:
         if 'is_published' in row:
-            assignment = dict(id=row['id'], name=row['title'], url=row['url'])
+            # id 'assignment_3922368'
+            assignment = dict(id=row['id'].split('_')[1], name=row['title'], url=row['url'])
             assignments.append(assignment)
 
     return assignments
@@ -202,6 +207,18 @@ def format_time(src_time):
     return time
 
 
+def find_section_and_grader(row):
+    spans = row.findAll('span', {'class': 'sectionsColumnCell--sectionSpan'})
+    section, grader = '', ''
+    for span in spans:
+        if re.match('[a-zA-Z]+', span.text):
+            grader = span.text
+        elif re.match('\d', span.text):
+            section = span.text
+
+    return section, grader
+
+
 def get_course_assignment_submissions_by_name(course_id, assignment_name):
     assignment = get_course_assignment_by_name(course_id, assignment_name)
     if assignment is None:
@@ -216,9 +233,67 @@ def get_course_assignment_submissions_by_name(course_id, assignment_name):
         name = row.find('a').text
         time = row.find('time').attrs['datetime']  # "2024-02-04 20:57:57 -0800"
         time = format_time(time)
-        grader = row.findAll('span', {'class': 'sectionsColumnCell--sectionSpan'})[-1].text
-        data = dict(name=name, time=time, grader=grader)
+        section, grader = find_section_and_grader(row)
+        data = dict(name=name, time=time, grader=grader, section=section)
         result.append(data)
+    return result
+
+
+def get_course_assignment_grades_by_name(course_id, assignment_name):
+    assignment = get_course_assignment_by_name(course_id, assignment_name)
+    if assignment is None:
+        return
+
+    response = gradescope.api.request(
+        endpoint=f'courses/{course_id}/assignments/{assignment["id"]}/grade'
+    )
+
+    soup = _bs4.BeautifulSoup(response.content.decode(), features="html.parser")
+
+    grading_table = soup.find('div', {'data-react-class': 'GradingDashboard'})
+    table_data = json.loads(grading_table.attrs['data-react-props'])
+
+    questions = table_data['presenter']['assignments'][assignment['id']]['questions']
+
+    result = []
+
+    for q in questions:
+        row = questions[q]
+        data = dict(id=row['id'], name=row['title'], grade_url=row['link'], submissions_url=row['submissionsLink'])
+        result.append(data)
+
+    return result
+
+
+def get_course_assignment_question_submissions_by_name(course_id, assignment_name, question_name):
+    grades = get_course_assignment_grades_by_name(course_id, assignment_name)
+    if not grades:
+        return
+
+    question = {}
+    for grade in grades:
+        if grade['name'] == question_name:
+            question = grade
+
+    if not question:
+        return
+
+    response = gradescope.api.request(endpoint=question['submissions_url'])
+
+    soup = _bs4.BeautifulSoup(response.content.decode(), features="html.parser")
+
+    table_data = soup.find('table').findAll('tr')[1:]
+
+    result = []
+    for row in table_data:
+        a_data = row.find('a')
+        url = a_data.attrs['href']
+        submissions_id = url.split('/')[-2]
+        name_email = a_data.text.split('(')
+        name = name_email[0].strip()
+        email = name_email[1][:-1]
+        result.append(dict(name=name, email=email, submissions_id=submissions_id, url=url))
+
     return result
 
 
