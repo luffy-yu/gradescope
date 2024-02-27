@@ -23,9 +23,9 @@ def calculate_days(due_date, submission):
     return days_gap
 
 
-project_name = 'Project 1'
-due_date = '2024-02-04 23:59:59'
-question_name = 'Violations'
+project_name = 'Project 2'
+due_date = '2024-02-25 23:59:59'
+question_name = 'Early submission extra credit'
 
 for course_id, course_name in {
     '702597': 'CS310 001-002-003',
@@ -50,5 +50,6 @@ for course_id, course_name in {
     df = pd.merge(df_submission, df_questions, on='name', how='inner')
 
     # write to file
-    excel_name = df.to_excel(f'Project 1 {question_name} {course_name}.xlsx', index=False, header=True, engine='openpyxl')
+    excel_name = df.to_excel(f'{project_name} {question_name} {course_name}.xlsx', index=False, header=True,
+                             engine='openpyxl')
     print(f'Finished {course_name}')
