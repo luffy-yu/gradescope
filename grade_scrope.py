@@ -25,7 +25,7 @@ def calculate_days(due_date, submission):
 
 project_name = 'Project 2'
 due_date = '2024-02-25 23:59:59'
-question_name = 'Early submission extra credit'
+question_name = 'Violations'
 
 for course_id, course_name in {
     '702597': 'CS310 001-002-003',
@@ -34,7 +34,8 @@ for course_id, course_name in {
     submissions = get_course_assignment_submissions_by_name(course_id, project_name)
     print(f'Number of submission in {course_name}: {len(submissions)}')
 
-    questions = get_course_assignment_question_submissions_by_name(course_id, project_name, question_name)
+    questions = get_course_assignment_question_submissions_by_name(course_id, project_name, question_name,
+                                                                   wrap_url=True)
 
     # update submission data
     for i in range(len(submissions)):
@@ -48,6 +49,9 @@ for course_id, course_name in {
 
     # join on name
     df = pd.merge(df_submission, df_questions, on='name', how='inner')
+
+    # to hyperlink
+    df['url'] = df['url'].apply(lambda x: f'=HYPERLINK("{x}")')
 
     # write to file
     excel_name = df.to_excel(f'{project_name} {question_name} {course_name}.xlsx', index=False, header=True,

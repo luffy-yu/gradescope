@@ -265,7 +265,7 @@ def get_course_assignment_grades_by_name(course_id, assignment_name):
     return result
 
 
-def get_course_assignment_question_submissions_by_name(course_id, assignment_name, question_name):
+def get_course_assignment_question_submissions_by_name(course_id, assignment_name, question_name, wrap_url=False):
     grades = get_course_assignment_grades_by_name(course_id, assignment_name)
     if not grades:
         return
@@ -292,6 +292,7 @@ def get_course_assignment_question_submissions_by_name(course_id, assignment_nam
         name_email = a_data.text.split('(')
         name = name_email[0].strip()
         email = name_email[1][:-1]
+        url = gradescope.api.BASE_URL + url if wrap_url else url
         result.append(dict(name=name, email=email, submissions_id=submissions_id, url=url))
 
     return result
